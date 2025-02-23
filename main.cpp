@@ -2,17 +2,16 @@
 #include <iomanip>
 #include <cmath>
 
+#include "Planet.h"
+
 using errorCode = int;
 
 static const long double PI      = acos(-1);
 static const long double deg2rad = 1.0; //PI / 180.0;
 static const long double rad2deg = 1.0; //180.0 / PI;
-static const long double Atms2Pa = 101325.;
 
 constexpr int PRECISION        = 5;
 constexpr int WIDTH            = 11;
-
-enum Planet_enum { Earth, Mars };
 
 struct Variables 
 {
@@ -35,36 +34,6 @@ public:
         double lift_over_drag_nd, double bank_angle_deg, double altitude_m) :
         flight_path_angle_deg(0), velocity_mps(0), ballistic_coefficient_nd(0), 
         nose_radius_m(0), lift_over_drag_nd(0), bank_angle_deg(0), altitude_m(0) {}
-};
-
-struct Planet 
-{
-    double gravity_mps2;
-    double atms_density_kgpm3;
-    double atms_pressure_Pa;
-    double radius_m;
-    double geoheight_m;
-public:
-    Planet() : gravity_mps2(0), atms_density_kgpm3(0), 
-    atms_pressure_Pa(0), radius_m(0), geoheight_m(0) {}
-
-    Planet(double gravity_mps2, double atms_density_kgpm3, 
-        double atms_pressure_Pa, double radius_m, double geoheight_m) : 
-        gravity_mps2(gravity_mps2), atms_density_kgpm3(atms_density_kgpm3),
-        atms_pressure_Pa(atms_pressure_Pa), radius_m(radius_m), geoheight_m(geoheight_m) {}
-};
-
-struct Atmosphere 
-{
-    long double temperature_k;
-    long double pressure_atms;
-    long double rho_kgpm3;
-public:
-    /** initialize input variables **/
-    Atmosphere() : temperature_k(0), pressure_atms(0), rho_kgpm3(0) {}
-
-    Atmosphere(double temperature_k, double pressure_atms, double rho_kgpm3) : 
-    temperature_k(temperature_k), pressure_atms(pressure_atms), rho_kgpm3(rho_kgpm3) {}
 };
 
 struct RungeKuttaVariables 
@@ -90,120 +59,7 @@ public:
         Vnmax(Vnmax), hnmax(hnmax), nmax(nmax) {}
 };
 
-Planet initialize_atmospheric_conditions(Planet_enum planet_enum) 
-{
-
-    if (planet_enum == Earth)
-     {
-        Planet planet = 
-        {
-            9.8062,         // gravity, mps2
-            1.226,          // atmospheric density, kgpm3
-            101325.0,       // atmospheric pressure, Pa
-            6378000.0,      // planet radius, m
-            7250.0          // geopotential height, m
-        };
-        return planet;
-       
-    }
-    else if (planet_enum == Mars) 
-    {
-        Planet planet = 
-        {
-            3.71,           // gravity, mps2
-            0.057,          // atmospheric density, kgpm3
-            600.0,          // atmospheric pressure, Pa
-            3380000.0,      // planet radius, m
-            11100.0         // geopotential height, m
-        };
-        return planet;
-    }
-}
-
-Atmosphere calculate_atmospheric_properties(double altitude_m, Planet_enum planet_enum) 
-{
-    Atmosphere atmosphere;
-    double temperature_k = 0.0;
-    double pressure_pa = 0.0;
-    double pressure_atms = 0.0;
-    long double rho_kgpm3 = 0.0;
-
-    if (planet_enum == Earth) 
-    {
-        if (altitude_m <= 11000) 
-        {
-            temperature_k = 288.19 - 0.00649 * altitude_m;
-            pressure_pa = 101290 * pow(temperature_k / 288.08, 5.256);
-            if (temperature_k < 0) 
-            {
-                temperature_k = 2.73;
-            }
-            rho_kgpm3 = ((pressure_pa / 1000) / (.2869 * (temperature_k)));
-        }
-        else if (altitude_m > 11000 && altitude_m < 25000) 
-        {
-            temperature_k = 216.69;
-            pressure_pa = 0.02265 * exp(1.73 - ((0.000157) * altitude_m));
-            if (temperature_k < 0) 
-            {
-                temperature_k = 2.73;
-            }
-            rho_kgpm3 = ((pressure_pa / 1000) / (.2869 * (temperature_k)));
-        }
-        else if (altitude_m >= 25000) 
-        {
-            temperature_k = 141.94 + 0.00229 * altitude_m;
-            pressure_pa = 2488 * pow(temperature_k / 216.6, -11.388);
-
-            if (temperature_k < 0) 
-            {
-                temperature_k = 2.73;
-            }
-            rho_kgpm3 = (pressure_pa / 1000) / (0.2869 * temperature_k);
-        }
-
-        pressure_atms = pressure_pa / 101325.;
-    }
-    else if (planet_enum == Mars) 
-    {
-        if (altitude_m < 7000) 
-        {
-            temperature_k = 242.15 - 0.00222 * altitude_m;
-            pressure_pa = 699 * exp(-0.00009 * altitude_m);
-            if (temperature_k < 0) 
-            {
-                temperature_k = 2.73;
-            }
-            rho_kgpm3 = abs((pressure_pa / 1000) / (.1921 * (temperature_k)));
-        }
-        else if (altitude_m >= 7000) 
-        {
-            temperature_k = 249.75 - 0.00222 * altitude_m;
-            pressure_pa = 669 * exp(-0.00009 * altitude_m);
-            rho_kgpm3 = abs((pressure_pa / 1000) / (.1921 * (temperature_k)));
-        }
-    }
-
-    if (temperature_k < 0) 
-    {
-        temperature_k = 2.73;
-    }
-
-    if (pressure_pa < 0) 
-    {
-        pressure_pa = 0.0;
-    }
-
-    pressure_atms = pressure_pa / 101325.;
-
-    atmosphere.temperature_k = temperature_k;
-    atmosphere.pressure_atms = pressure_atms;
-    atmosphere.rho_kgpm3 = rho_kgpm3;
-
-    return atmosphere;
-}
-
-RungeKuttaVariables calculate_next_runge_kutta_step(RungeKuttaVariables rkv, Variables var, Atmosphere& atms, Planet& planet, double g, double dt) 
+RungeKuttaVariables calculate_next_runge_kutta_step(RungeKuttaVariables& rkv, Variables& var, Planet* planet, double g, double dt) 
 {
     RungeKuttaVariables new_rkv;
     /** Runge-Kutta Numerical Scheme **/
@@ -212,8 +68,8 @@ RungeKuttaVariables calculate_next_runge_kutta_step(RungeKuttaVariables rkv, Var
     double k11, k21, k31, k12, k22, k32, k13,
         k23, k33, k14, k24, k34, k15, k25, k35, k16, k26, k36;
 
-    double rhot = atms.rho_kgpm3;
-    double Re = planet.radius_m;
+    double rhot = planet->getAtmsDensity_kgpm3();
+    double Re = planet->getRadius_m();
     double B = var.ballistic_coefficient_nd;
     double LoD = var.lift_over_drag_nd;
     double bank = var.bank_angle_deg * deg2rad;
@@ -271,9 +127,9 @@ RungeKuttaVariables calculate_next_runge_kutta_step(RungeKuttaVariables rkv, Var
     dS      = -1. / tan(y2k1) * (0.011111111 * (7.0 * k31 + 32. * k33 + 12. * k34 + 32. * k35 + 7. * k36) * dt);
 
     dvdt = -((rhot * pow(Vt,2)) / (2.0 * B)) + g * sin(gammat);
-    new_rkv.nmax = std::min(new_rkv.nmax, dvdt / planet.gravity_mps2);
 
-    if (new_rkv.nmax == dvdt / planet.gravity_mps2) 
+    new_rkv.nmax = std::min(new_rkv.nmax, dvdt / planet->getGravity_mps2());
+    if (new_rkv.nmax == dvdt / planet->getGravity_mps2()) 
     {
         new_rkv.Vnmax = y1k1;
         new_rkv.hnmax = y3k1;
@@ -288,127 +144,31 @@ RungeKuttaVariables calculate_next_runge_kutta_step(RungeKuttaVariables rkv, Var
     return new_rkv;
 }
 
-double calculate_radiation_heat(double v, double rho, double rnose, Planet_enum planet_selection) 
+errorCode run_reentry(Planet* planet, Variables& var, double dtime_sec) 
 {
-    double a, b, c, fv, dfdv, qrad;
-
-    double vedat[19] = 
-    {
-        9000, 9250, 9500, 9750, 10000, 10250, 10500, 10750, 11000,
-        11500, 12000, 12500, 13000, 13500, 14000, 14500, 15000, 15500, 16000
-    };
-    double fevdat[19] = 
-    {
-        1.5, 4.3, 9.7, 19.5, 35., 55., 81., 115., 151., 238., 359.,
-        495., 660., 850., 1065., 1313., 1550., 1780., 2040.
-    };
-    double vmdat[17] = 
-    {
-        6000, 6150, 6300, 6500, 6700, 6900, 7000, 7200, 7400, 7600,
-        7800, 8000, 8200, 8400, 8600, 8800, 9000
-    };
-    double fmvdat[17] = 
-    {
-        0.2, 1.0, 1.95, 3.42, 5.1, 7.1, 8.1, 10.2, 12.5, 14.8, 17.1,
-        19.2, 21.4, 24.1, 26.0, 28.9, 32.8
-    };
-        
-    if (planet_selection == Earth) 
-    {
-        a = 1.072e+06 * pow(v, -1.88) * pow(rho, -0.325);
-        a = std::min(a, 1.0);
-        if (rnose > 1.0 && rnose < 2.0) 
-        {
-            a = std::min(a, 0.6);
-        }
-        if (rnose > 2.0 && rnose < 3.0) 
-        {
-            a = std::min(a, 0.5);
-        }
-        b = 1.22;
-        c = 4.736e+04;
-                    
-        if (v < vedat[0]) 
-        {
-            fv = fevdat[0];
-        }
-        else 
-        {
-            fv = fevdat[19];    // if v > any value listed in vedat
-            for (size_t i = 1; i < 18; i++) 
-            {
-                if (v < vedat[i]) 
-                {
-                    dfdv = (fevdat[i] - fevdat[i - 1]) / (vedat[i] - vedat[i - 1]);
-                    fv = fevdat[i - 1] + (v - vedat[i - 1]) * dfdv;
-                }
-            }
-        }
-
-        if (v < 9000) 
-        {
-            c = 0.;
-        }
-    }
-    else if (planet_selection == Mars) 
-    {
-        a = 0.526;
-        b = 1.19;
-        c = 2.35e+04;
-
-        if (v < vmdat[0]) 
-        {
-            fv = fmvdat[0];
-        }
-        else 
-        {
-            fv = fmvdat[16];        // if v > any value listed in vmdat
-            for (size_t i = 1; i < 16; i++) 
-            {
-                if (v < vmdat[i]) 
-                {
-                    dfdv = (fmvdat[i] - fmvdat[i - 1]) / (vmdat[i] - vmdat[i - 1]);
-                    fv = fmvdat[i - 1] + (v - vmdat[i - 1]) * dfdv;
-                }
-            }
-        }
-        if (v < 5500) 
-        {
-            c = 0.;
-        }
-    }         
-    
-    qrad = c * pow(rnose, a) * pow(rho, b) * fv;
-    return qrad;
-}
-
-errorCode run_reentry(Planet_enum planet_selection, Variables& var, double dtime_sec, double dtime_out_sec) 
-{
-    Atmosphere atmosphere;
     RungeKuttaVariables rkv;
-    Planet planet = initialize_atmospheric_conditions(planet_selection);
 
     errorCode returnCode = 0; // 0 = returned successfully, -1 = error encountered
     
     bool isRunning  = true;
 
     /** Initialize Loop Variables **/
-    double time     = 0.0;
-    double Cp       = 1.27;
-    double prntint  = 1.0;
-    double tprnt    = 1.0;
-    double nmax     = 100.0;
-    double n        = 0.0;
-    double qtotal   = 0.0;
-    double qradbc   = 0.0;
-    double s        = 0.0;
-    double Hrec     = (pow(var.velocity_mps, 2.) / 2.) / 2325.854324;
-    double ruCh     = 1.0e-6;
-    double lam      = 4;
-    double g        = 0.0;
-    double dynprs   = 0.0;
-    double dynprs0  = 0.0;
-    double surfP    = 0.0; 
+    double time                         = 0.0;
+    double Cp                           = 1.27;
+    double prntint                      = 1.0;
+    double tprnt                        = 1.0;
+    double nmax                         = 100.0;
+    double n                            = 0.0;
+    double qtotal                       = 0.0;
+    double qradbc                       = 0.0;
+    double s                            = 0.0;
+    double Hrec                         = (pow(var.velocity_mps, 2.) / 2.) / 2325.854324;
+    double ruCh                         = 1.0e-6;
+    double lam                          = 4;
+    double g                            = 0.0;
+    double dynprs                       = 0.0;
+    double dynprs0                      = 0.0;
+    double surfP                        = planet->getAtmsPressure_Atms() + dynprs0 * Cp; 
     double acceleration                 = 0.0;
 
     double prev_altitude_m              = var.altitude_m;
@@ -417,15 +177,13 @@ errorCode run_reentry(Planet_enum planet_selection, Variables& var, double dtime
     double prev_velocity_mps            = var.velocity_mps;
     double prev_flight_path_angle_deg   = var.flight_path_angle_deg;
     double curr_flight_path_angle_deg   = var.flight_path_angle_deg;
-    double curr_rho                     = planet.atms_density_kgpm3;
+    double curr_rho                     = planet->getAtmsDensity_kgpm3();
     double prev_qconv                   = 0.0;  
     double curr_qconv                   = 0.0;
     double prev_qrad                    = 0.0;
     double curr_qrad                    = 0.0;
     double prev_qtotal                  = 0.0;
     double curr_qtotal                  = 0.0;
-    double prev_deltaS                  = 0.0;
-    double curr_deltaS                  = 0.0;
     double prev_delta_velocity_mps      = 0.0;
     double curr_delta_velocity_mps      = 0.0;
 
@@ -452,18 +210,14 @@ errorCode run_reentry(Planet_enum planet_selection, Variables& var, double dtime
     std::cout << "-----------------------------------------------";
     std::cout << "-----------------------------------------------" << std::endl;
 
-    // initialize atmosphere and for printing initial values
-    atmosphere = calculate_atmospheric_properties(curr_altitude_m, planet_selection);
-
-    surfP = atmosphere.pressure_atms + dynprs0 * Cp;
-    
+    // print initial conditions
     std::cout << std::setprecision(PRECISION);
     std::cout << std::setw(WIDTH) << std::round(time);
     std::cout << std::setw(WIDTH) << curr_altitude_m;
     std::cout << std::setw(WIDTH) << curr_velocity_mps;
-    std::cout << std::setw(WIDTH) << atmosphere.pressure_atms * Atms2Pa;
-    std::cout << std::setw(WIDTH) << atmosphere.temperature_k;
-    std::cout << std::setw(WIDTH) << atmosphere.rho_kgpm3;
+    std::cout << std::setw(WIDTH) << planet->getAtmsPressure_Pa();
+    std::cout << std::setw(WIDTH) << planet->getAtmsTemperature_K();
+    std::cout << std::setw(WIDTH) << planet->getAtmsDensity_kgpm3();
     std::cout << std::setw(WIDTH) << curr_flight_path_angle_deg;
     std::cout << std::setw(WIDTH) << n;
     std::cout << std::setw(WIDTH) << curr_qconv;
@@ -485,15 +239,71 @@ errorCode run_reentry(Planet_enum planet_selection, Variables& var, double dtime
         rkv.flight_path_deg     = curr_flight_path_angle_deg;
         rkv.delta_velocity_mps  = curr_delta_velocity_mps;
 
+        g = planet->getGravity_mps2() / pow(1 + (curr_altitude_m / planet->getRadius_m()), 2); 
+
+        // update atmosphere data
+        planet->calculate_atmospheric_properties(curr_altitude_m);      
+
+        // run, then update the runge-kutta variables
+        rkv = calculate_next_runge_kutta_step(rkv, var, planet, g, dtime_sec);
+        s                           = s + rkv.deltaS;
+        prev_velocity_mps           = curr_velocity_mps;
+        curr_velocity_mps           = rkv.velocity_mps;
+        prev_altitude_m             = curr_altitude_m;
+        curr_altitude_m             = rkv.altitude_m;
+        prev_flight_path_angle_deg  = curr_flight_path_angle_deg;
+        curr_flight_path_angle_deg  = rkv.flight_path_deg;
+        prev_delta_velocity_mps     = curr_delta_velocity_mps;
+        curr_delta_velocity_mps     = rkv.delta_velocity_mps;
+
+        curr_rho = planet->getAtmsDensity_kgpm3();
+        dynprs = .5 * curr_rho * pow(rkv.velocity_mps, 2);
+
+        planet->calculate_radiation_heat(curr_velocity_mps, curr_rho, var.nose_radius_m);
+        curr_qrad = planet->getQrad_wpcm2();
+
+        qradbc = curr_qrad * 0.881;
+
+        planet->calculate_convective_heat_transfer(curr_velocity_mps, var.nose_radius_m);
+
+        curr_qtotal = prev_qtotal + ((prev_qconv + curr_qconv) / 2.0) * dtime_sec + ((prev_qrad + curr_qrad) / 2.0) * dtime_sec;
+        
+        Hrec = pow(curr_velocity_mps, 2.) / 2.;
+
+        ruCh = (curr_qconv * 10000) / Hrec;
+
+        Hrec = Hrec / 2325.854324;
+
+        ruCh = ruCh / 4.882;
+
+        surfP = planet->getAtmsPressure_Atms() + dynprs0 * Cp;
+        
+        n = rkv.delta_velocity_mps / planet->getGravity_mps2();
+
+        // update heat transfer variables        
+        prev_qconv                  = curr_qconv;
+        prev_qrad                   = curr_qrad;
+        prev_qtotal                 = curr_qtotal;
+        
+        acceleration = (curr_velocity_mps - prev_velocity_mps) / dtime_sec / planet->getGravity_mps2();
+
+        if (curr_altitude_m > prev_altitude_m + 100) {
+            std::cout << "Flight path angle too shallow for the given entry velocity."              << std::endl; 
+            std::cout << "Vehicle will skip out of the atmosphere, make flight path angle larger"   << std::endl;
+            isRunning = false;
+            returnCode = -1;
+            break;
+        }
+
         // print the starting conditions
         if (time >= tprnt) {
             std::cout << std::setprecision(PRECISION);
             std::cout << std::setw(WIDTH) << std::round(time);
             std::cout << std::setw(WIDTH) << curr_altitude_m;
             std::cout << std::setw(WIDTH) << curr_velocity_mps;
-            std::cout << std::setw(WIDTH) << atmosphere.pressure_atms * Atms2Pa;
-            std::cout << std::setw(WIDTH) << atmosphere.temperature_k;
-            std::cout << std::setw(WIDTH) << atmosphere.rho_kgpm3;
+            std::cout << std::setw(WIDTH) << planet->getAtmsPressure_Pa();
+            std::cout << std::setw(WIDTH) << planet->getAtmsTemperature_K();
+            std::cout << std::setw(WIDTH) << planet->getAtmsDensity_kgpm3();
             std::cout << std::setw(WIDTH) << curr_flight_path_angle_deg;
             std::cout << std::setw(WIDTH) << n;
             std::cout << std::setw(WIDTH) << curr_qconv;
@@ -509,95 +319,41 @@ errorCode run_reentry(Planet_enum planet_selection, Variables& var, double dtime
             tprnt = tprnt + prntint;
         }
 
-        g = planet.gravity_mps2 / pow(1 + (curr_altitude_m / planet.radius_m), 2); 
-
-        rkv = calculate_next_runge_kutta_step(rkv, var, atmosphere, planet, g, dtime_sec);
-
-        s += rkv.deltaS;
-
-        dynprs = .5 * atmosphere.rho_kgpm3 * pow(rkv.velocity_mps, 2);
-
-        curr_rho = atmosphere.rho_kgpm3;
-
-        curr_qrad = calculate_radiation_heat(curr_velocity_mps, atmosphere.rho_kgpm3, var.nose_radius_m, planet_selection);
-        qradbc = curr_qrad * 0.881;
-
-        if (planet_selection == Earth) {
-            curr_qconv = (1.74153e-4 * pow(curr_rho / var.nose_radius_m, 0.5) * pow(curr_velocity_mps, 3)) / 10000.0;
-        }
-        else if (planet_selection == Mars) {
-            curr_qconv = (1.9027e-4 * pow(curr_rho / var.nose_radius_m, 0.5) * pow(curr_velocity_mps, 3)) / 10000.0;
-        }
-
-        curr_qtotal = prev_qtotal + ((prev_qconv + curr_qconv) / 2.0) * dtime_sec + ((prev_qrad + curr_qrad) / 2.0) * dtime_sec;
-        
-        Hrec = pow(curr_velocity_mps, 2.) / 2.;
-
-        ruCh = (curr_qconv * 10000) / Hrec;
-
-        Hrec = Hrec / 2325.854324;
-
-        ruCh = ruCh / 4.882;
-
-        surfP = atmosphere.pressure_atms + dynprs0 * Cp;
-
-        rkv.delta_velocity_mps = -(curr_rho * pow(curr_velocity_mps, 2)) / (2.0 * var.ballistic_coefficient_nd) + g * sin(curr_flight_path_angle_deg * deg2rad);
-        
-        n = rkv.delta_velocity_mps / g;
-
-        // update loop variables
-        prev_altitude_m             = curr_altitude_m;
-        curr_altitude_m             = rkv.altitude_m;
-        prev_velocity_mps           = curr_velocity_mps;
-        curr_velocity_mps           = rkv.velocity_mps;
-        prev_flight_path_angle_deg  = curr_flight_path_angle_deg;
-        curr_flight_path_angle_deg  = rkv.flight_path_deg;
-        prev_deltaS                 = curr_deltaS;
-        curr_deltaS                 = rkv.deltaS;
-        prev_delta_velocity_mps     = curr_delta_velocity_mps;
-        curr_delta_velocity_mps     = rkv.delta_velocity_mps;
-        prev_qconv                  = curr_qconv;
-        prev_qrad                   = curr_qrad;
-        prev_qtotal                 = curr_qtotal;
-
-        acceleration = (curr_velocity_mps - prev_velocity_mps) / dtime_sec / g;
-        if (curr_altitude_m > prev_altitude_m + 100) {
-            std::cout << "Flight path angle too shallow for the given entry velocity." << std::endl; 
-            std::cout << "Vehicle will skip out of the atmosphere, make flight path angle larger" << std::endl;
-            isRunning = false;
-            returnCode = -1;
-            break;
-        }
-
         time += dtime_sec;
-
-        // update atmosphere data
-        atmosphere = calculate_atmospheric_properties(curr_altitude_m, planet_selection);
     }
-
     return returnCode;
 }
 
 int main()
 {
     Variables vars;
-    vars.velocity_mps               = 5000.0;
-    vars.altitude_m                 = 60000.0;
-    vars.flight_path_angle_deg      = 50.0;
-    vars.ballistic_coefficient_nd   = 3000.0;
-    vars.nose_radius_m              = 3.0;
+
+    // vars.velocity_mps               = 5000.0;
+    // vars.altitude_m                 = 60000.0;
+    // vars.flight_path_angle_deg      = 50.0;
+    // vars.ballistic_coefficient_nd   = 3000.0;
+    // vars.nose_radius_m              = 3.0;
+    // vars.lift_over_drag_nd          = 2.3;
+    // vars.bank_angle_deg             = 0.0;
+    // /** select planet **/
+    // Earth planet     = Earth();
+
+    vars.velocity_mps               = 8000.0;
+    vars.altitude_m                 = 32000.0;
+    vars.flight_path_angle_deg      = 76.0;
+    vars.ballistic_coefficient_nd   = 5439.0;
+    vars.nose_radius_m              = 2.2;
     vars.lift_over_drag_nd          = 2.3;
-    vars.bank_angle_deg             = 0.0;    
+    vars.bank_angle_deg             = 10.0;
+    Mars planet         = Mars();
 
     /** select planet **/
-    Planet_enum planet_selection = Earth; // Either 'Earth' or 'Mars'
-
+    Planet* pPlanet     = &planet;          // Either 'Earth' or 'Mars'
     /** time intervals **/
     double dtime_sec           = 0.05; // Time steps in calculations
-    double dtime_out_sec       = 1.00; // Time steps for print out
 
     errorCode simErrorCode;
-    simErrorCode = run_reentry(planet_selection, vars, dtime_sec, dtime_out_sec);
+    simErrorCode = run_reentry(pPlanet, vars, dtime_sec);
     std::cout << "Returned " << simErrorCode << "\n" << std::endl;
     return simErrorCode;
 }
