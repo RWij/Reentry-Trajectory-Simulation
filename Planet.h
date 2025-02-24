@@ -3,6 +3,8 @@
 
 #include <cmath>
 
+static const double Atms2Pa = 101325.;
+
 class Planet 
 {
 protected:
@@ -73,6 +75,9 @@ public:
 
     void calculate_atmospheric_properties(double altitude_m) override
     {
+        /*
+        Earth Atmospheric model
+        */
         double temperature_k = 0.0;
         double pressure_pa = 0.0;
         double pressure_atms = 0.0;
@@ -129,6 +134,11 @@ public:
 
     void calculate_radiation_heat(double velocity_mps, double rho_kgpm3, double rnose_m) override
     {
+        /* 
+            Tauber Sutton Radiation Calculation    
+            "Stagnation Point Radiative Heating Relations for Earth"
+            From J. Spacecraft, Vol 28. No. 1, pp 40-43
+        */
         double a, b, c, fv, dfdv, qrad;
 
         a = 1.072e+06 * pow(velocity_mps, -1.88) * pow(rho_kgpm3, -0.325);
@@ -195,7 +205,11 @@ public:
     Mars();
 
     void calculate_atmospheric_properties(double altitude_m) override
-    {
+    {        
+        /*
+        Mars Atmospheric model
+        */
+
         double temperature_k = 0.0;
         double pressure_pa = 0.0;
         double pressure_atms = 0.0;
@@ -241,6 +255,11 @@ public:
 
     void calculate_radiation_heat(double velocity_mps, double rho_kgpm3, double rnose_m) override
     {
+        /* 
+            Tauber Sutton Radiation Calculation    
+            "Stagnation Point Radiative Heating Relations for Mars"
+            From J. Spacecraft, Vol 28. No. 1, pp 40-43
+        */
         double a, b, c, fv, dfdv, qrad;
 
         a = 0.526;

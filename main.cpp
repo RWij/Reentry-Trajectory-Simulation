@@ -211,6 +211,8 @@ errorCode run_reentry(Planet* planet, Variables& var, double dtime_sec)
     std::cout << "-----------------------------------------------" << std::endl;
 
     // print initial conditions
+    planet->calculate_atmospheric_properties(curr_altitude_m);      
+
     std::cout << std::setprecision(PRECISION);
     std::cout << std::setw(WIDTH) << std::round(time);
     std::cout << std::setw(WIDTH) << curr_altitude_m;
@@ -265,6 +267,7 @@ errorCode run_reentry(Planet* planet, Variables& var, double dtime_sec)
         qradbc = curr_qrad * 0.881;
 
         planet->calculate_convective_heat_transfer(curr_velocity_mps, var.nose_radius_m);
+        curr_qconv = planet->getQconv_wpcm2();
 
         curr_qtotal = prev_qtotal + ((prev_qconv + curr_qconv) / 2.0) * dtime_sec + ((prev_qrad + curr_qrad) / 2.0) * dtime_sec;
         
@@ -278,7 +281,8 @@ errorCode run_reentry(Planet* planet, Variables& var, double dtime_sec)
 
         surfP = planet->getAtmsPressure_Atms() + dynprs0 * Cp;
         
-        n = rkv.delta_velocity_mps / planet->getGravity_mps2();
+        curr_delta_velocity_mps = -(curr_rho * pow(curr_velocity_mps, 2.0)) / (2.0 * var.ballistic_coefficient_nd) + g * sin(curr_flight_path_angle_deg);
+        n = curr_delta_velocity_mps / planet->getGravity_mps2();
 
         // update heat transfer variables        
         prev_qconv                  = curr_qconv;
