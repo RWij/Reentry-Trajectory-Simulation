@@ -1,1 +1,3 @@
-# Reentry_Trajectory
+# Reentry Trajectory Simulation 
+
+# Written in C++ for practice.
